@@ -239,3 +239,9 @@ ENDIF( EVEMU_BUILD_TESTS )
 
 # the market simulation harness and its tests (CTest)
 ADD_SUBDIRECTORY( "src/eve-market-sim" )
+
+# Headless test client, used to test the server without the game client
+OPTION( EVEMU_BUILD_BOT "Build the eve-bot test client" OFF )
+IF( EVEMU_BUILD_BOT )
+  ADD_SUBDIRECTORY( "src/eve-bot" )
+ENDIF( EVEMU_BUILD_BOT )
