@@ -547,7 +547,7 @@ boolean can use either 0/1 OR true/false.
     <debug><!-- switches for various server methods -->
         <BubbleTrack>false</BubbleTrack><!-- bool - create jetcans at center and edges of bubble (7 per bubble) -->
         <SpawnTest>false</SpawnTest><!-- bool - enables 5s respawn timer -->
-        <IsTestServer>true</IsTestServer>  <!--  bool   -some functions disabled for live server -->
+        <IsTestServer>false</IsTestServer>  <!--  bool   -some functions disabled for live server; дома — обычная игра (риги при снятии ломаются, сигнатур как на живом) -->
         <UseProfiling>false</UseProfiling><!-- bool  - use internal memobj code profiling system -->
         <ProfileTraceTime>5000</ProfileTraceTime><!-- msec  profile time above this will print StackTrace  default: 500 -->
         <UseShipTracking>false</UseShipTracking><!-- bool -->
