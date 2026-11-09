@@ -11,6 +11,7 @@
 #include "StaticDataMgr.h"
 #include "StatisticMgr.h"
 #include "exploration/Exploration.h"
+#include "exploration/WreckSalvage.h"
 #include "ship/modules/Prospector.h"
 #include "system/Container.h"
 #include "system/SystemManager.h"
@@ -226,79 +227,7 @@ void Prospector::OnSalvageSuccess()
 
     Client* pClient(m_shipRef->GetPilot());
     bool overloaded(false);
-    uint32 dropped(0);
-    std::vector<uint32> list;
-    sDataMgr.GetSalvage(atoi(m_targetSE->GetSelf()->customInfo().c_str()), list);
-    if (!list.empty()) {
-        uint8 drop = 1;
-        switch (m_targetSE->GetSelf()->GetAttribute(AttrAccessDifficulty).get_int()) {       // drop qty * rate in config
-            case  30: drop = 1; break;  //  1 to 3
-            case  20: drop = 2; break;  //  2 to 6
-            case  10: drop = 3; break;  //  3 to 9
-            case   0: drop = 4; break;  //  4 to 12
-            case -10: drop = 5; break;  //  5 to 15
-            case -20: drop = 6; break;  //  6 to 18
-        }
-
-        InventoryItemRef iRef(nullptr);
-        Inventory* sInv(m_shipRef->GetMyInventory());
-        uint32 quantity = 0, minDrop = drop, maxDrop = (drop * sConfig.rates.DropSalvage);
-        for (auto cur : list) {
-            // each drop has 50/50 chance.  may need to change this later.   base on char's salvage skill?
-            if (IsEven(MakeRandomInt(0,10)))
-                continue;
-            quantity = (MakeRandomInt(minDrop, maxDrop));
-            if (quantity < 1)
-                quantity = 1;
-            ItemData iLoot(cur, pClient->GetCharacterID(), locTemp, flagNone, quantity);
-            iRef = sItemFactory.SpawnItem(iLoot);
-            if (iRef.get() == nullptr) // we'll get over it...continue
-                continue;
-            if (sInv->HasAvailableSpace(m_holdFlag, iRef)) {
-                iRef->MergeTypesInCargo(m_shipRef.get(), m_holdFlag);
-                ++dropped;
-                _log(MODULE__DEBUG, "Prospector::OnSalvageSuccess - dropped %u %s of %u/%u", quantity, iRef->name(), minDrop, maxDrop);
-            } else {
-                _log(MODULE__DEBUG, "Prospector::OnSalvageSuccess - %s's %s is full.", m_shipRef->name(), sDataMgr.GetFlagName(m_holdFlag));
-                // what doesn't fit is destroyed in the process
-                iRef->Delete();
-                overloaded = true;
-                break;
-            }
-        }
-    }
-
-    if (!m_targetSE->GetSelf()->GetMyInventory()->IsEmpty()) {
-        // tell wreck it's being salvaged, so do not broadcast slim updates...may no longer need this.  jetcan set to initial location 0
-        pWreck->Salvaged();
-
-        std::map<uint32, InventoryItemRef> shipLoot;
-        shipLoot.clear();
-        m_targetSE->GetSelf()->GetMyInventory()->GetInventoryMap(shipLoot);
-
-        // create new container
-        ItemData p_idata(23,   // 23 = cargo container
-                        m_targetSE->GetSelf()->ownerID(),
-                        locTemp,
-                        flagNone,
-                        "Jettisoned Loot Container",
-                        m_targetSE->GetPosition());
-
-        CargoContainerRef jetCanRef = sItemFactory.SpawnCargoContainer(p_idata);
-        if (jetCanRef.get() != nullptr) {
-            for (auto cur : shipLoot)
-                cur.second->Move(jetCanRef->itemID(),flagNone);
-            FactionData data = FactionData();
-                data.allianceID = m_targetSE->GetAllianceID();
-                data.corporationID = m_targetSE->GetCorporationID();
-                data.factionID = m_targetSE->GetWarFactionID();
-                data.ownerID = m_targetSE->GetSelf()->ownerID();
-            ContainerSE* cSE = new ContainerSE(jetCanRef, m_targetSE->GetServices(), m_sysMgr, data);
-            jetCanRef->SetMySE(cSE);
-            m_sysMgr->AddEntity(cSE);
-            m_targetSE->DestinyMgr()->SendJettisonPacket();
-        }
-    }
+    uint32 dropped(WreckSalvage::Salvage(m_targetSE, m_shipRef, pClient, m_holdFlag, overloaded));
 
     // add data to StatisticMgr
     sStatMgr.Increment(Stat::shipsSalvaged);

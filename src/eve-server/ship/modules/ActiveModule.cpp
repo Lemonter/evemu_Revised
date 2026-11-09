@@ -36,6 +36,7 @@
 #include "system/SystemManager.h"
 #include "system/sov/SovereigntyDataMgr.h"
 #include "effects/EffectsDataMgr.h"
+#include "system/TargetManager.h"
 
 namespace {
     /* npc ai (level one, PLAN.md 5.7):  the hp of the layer a remote repair module works on (-1:  not one).  the difference
@@ -1037,6 +1038,9 @@ void ActiveModule::CycleComplete()
         } break;
         case EVEDB::invGroups::Cargo_Scanner: {
             CargoScanResult();
+        } break;
+        case EVEDB::invGroups::Tractor_Beam: {
+            TractorCycle();
         } break;
     }
 }
@@ -2155,3 +2159,115 @@ void ActiveModule::LaunchSnowBall()
 {
     // not used yet
 }
+
+/* ======================================================================================
+ *  home server:  tractor beams that loot (world.tractorAutoLoot)
+ *
+ *  at the end of each cycle, a wreck or can the beam has brought within loot range (2500m) is emptied into the cargo hold.
+ *  once it's empty the beam lets it go and takes the nearest wreck or can within the module's range that still holds
+ *  something and that the pilot may tractor (the same owner/fleet/corp/alliance/militia rule as activating it).  with
+ *  nothing left in range the beam stays on the empty one and looks again next cycle
+ * ====================================================================================== */
+
+void ActiveModule::TractorCycle()
+{
+    if (!sConfig.world.tractorAutoLoot or (m_targetSE == nullptr) or (m_sysMgr == nullptr))
+        return;
+    Client* pClient(m_shipRef->GetPilot());
+    if (pClient == nullptr)
+        return;
+
+    Inventory* pInv(m_targetSE->GetSelf()->GetMyInventory());
+    double gap(m_shipRef->position().distance(m_targetSE->GetPosition()) - m_targetSE->GetRadius() - m_shipRef->GetAttribute(AttrRadius).get_double());
+    if ((pInv != nullptr) and !pInv->IsEmpty()) {
+        if (gap > 2500.0)
+            return;     // still on its way in
+        std::vector<InventoryItemRef> items;
+        pInv->GetInventoryVec(items);
+        for (auto cur : items) {
+            if (!m_shipRef->GetMyInventory()->HasAvailableSpace(flagCargoHold, cur)) {
+                pClient->SendNotifyMsg("Your cargo hold is full.  The %s stops looting.", m_modRef->name());
+                m_Stop = true;
+                return;
+            }
+            // looted:  it's the pilot's now
+            if (cur->ownerID() != pClient->GetCharacterID())
+                cur->ChangeOwner(pClient->GetCharacterID(), false);
+            cur->MergeTypesInCargo(m_shipRef.get(), flagCargoHold);
+        }
+        if (!pInv->IsEmpty())
+            return;
+    }
+
+    SystemEntity* pNext(FindTractorTarget());
+    if (pNext != nullptr)
+        RetargetTractor(pNext);
+}
+
+bool ActiveModule::CanTractor(SystemEntity* pSE)
+{
+    if ((pSE == nullptr) or pSE->IsDead() or (pSE->DestinyMgr() == nullptr) or pSE->DestinyMgr()->IsTractored())
+        return false;
+    if (pSE->IsContainerSE()) {
+        ContainerSE* pCont(pSE->GetContSE());
+        if (pCont->IsAnchored() or pCont->IsLocked())
+            return false;
+    } else if (!pSE->IsWreckSE()) {
+        return false;
+    }
+    Client* pPilot(m_shipRef->GetPilot());
+    if (pSE->GetOwnerID() == m_shipRef->ownerID())
+        return true;
+    if (pSE->GetCorporationID() == pPilot->GetCorporationID())
+        return true;
+    if ((pSE->GetAllianceID() != 0) and (pSE->GetAllianceID() == pPilot->GetAllianceID()))
+        return true;
+    if ((pSE->GetWarFactionID() != 0) and (pSE->GetWarFactionID() == pPilot->GetWarFactionID()))
+        return true;
+    if (pPilot->InFleet() and (pPilot->GetFleetID() == pSE->GetFleetID()))
+        return true;
+    return false;
+}
+
+SystemEntity* ActiveModule::FindTractorTarget()
+{
+    double range(GetAttribute(AttrMaxRange).get_double());
+    SystemEntity* pBest(nullptr);
+    double best(0.0);
+    for (auto cur : m_sysMgr->GetEntities()) {
+        SystemEntity* pSE(cur.second);
+        if ((pSE == nullptr) or (pSE == m_targetSE) or !CanTractor(pSE))
+            continue;
+        Inventory* pInv(pSE->GetSelf()->GetMyInventory());
+        if ((pInv == nullptr) or pInv->IsEmpty())
+            continue;
+        double gap(m_shipRef->position().distance(pSE->GetPosition()) - pSE->GetRadius());
+        if (gap > range)
+            continue;
+        if ((pBest == nullptr) or (gap < best)) {
+            pBest = pSE;
+            best = gap;
+        }
+    }
+    return pBest;
+}
+
+void ActiveModule::RetargetTractor(SystemEntity* pNext)
+{
+    _log(MODULE__TRACE, "%s on %s:  tractoring %s(%u) next", m_modRef->name(), m_shipRef->name(), pNext->GetName(), pNext->GetID());
+    // let go of the empty one where it is
+    if (m_targetSE != nullptr) {
+        ShowEffect(false);
+        if (m_targetSE->DestinyMgr() != nullptr)
+            m_targetSE->DestinyMgr()->TractorBeamStop();
+        if (m_targetSE->TargetMgr() != nullptr)
+            m_targetSE->TargetMgr()->RemoveTargetModule(this);
+    }
+    m_targetSE = pNext;
+    m_targetID = pNext->GetID();
+    if (pNext->TargetMgr() != nullptr)
+        pNext->TargetMgr()->AddTargetModule(this);
+    pNext->DestinyMgr()->TractorBeamStart(m_shipRef->GetPilot()->GetShipSE(), GetAttribute(AttrMaxTractorVelocity));
+    ShowEffect(true);
+}
+

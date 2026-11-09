@@ -114,6 +114,10 @@ boolean can use either 0/1 OR true/false.
         <StoreShipWithCargo>false</StoreShipWithCargo><!-- bool - ships stored in a maintenance bay/array may carry cargo (only assembled containers are refused, the Odyssey rule).  Crucible: false (charges only) -->
         <highSecCyno>true</highSecCyno><!-- bool - allow Cynosural fields to be created in high security space.  дома: капиталы летают везде -->
         <capitalsEverywhere>true</capitalsEverywhere><!-- bool - capitals use acceleration gates (missions, deadspace).  Crucible: false -->
+        <droneAutoMine>true</droneAutoMine><!-- bool - idle mining drones find the nearest asteroid and keep mining it.  Crucible: false -->
+        <miningDroneRange>250000</miningDroneRange><!-- m - auto-mining drones look for rock and deliver ore up to this far from the ship (0 = drone range) -->
+        <salvageDroneTypeID>1202</salvageDroneTypeID><!-- this drone type salvages wrecks (its own model and beam).  1202 = Civilian Mining Drone.  0 = none (Crucible) -->
+        <tractorAutoLoot>true</tractorAutoLoot><!-- bool - tractor beams empty what they pull in into the cargo hold, then take the next wreck or can.  Crucible: false -->
         <empireInterdiction>false</empireInterdiction><!-- bool - allow items flagged 'disallowInEmpireSpace' (warp disruption bubbles, HIC fields, bombs, doomsday) in high and low security space.  Crucible: false -->
         <fleetWarpOnGridOnly>false</fleetWarpOnGridOnly><!-- bool - fleet/wing/squad warp only takes members on the commander's grid (the 2015 rule).  Crucible: false (every member in the system warps) -->
         <TrashRetentionDays>30</TrashRetentionDays><!-- days a trashed item is kept for GM restore (/untrash) before it is purged at server startup.  0 = trashed items are deleted at once -->
@@ -140,6 +144,7 @@ boolean can use either 0/1 OR true/false.
         <WebUpdate>15</WebUpdate><!-- save current server status in db.  in minutes  15m default -->
         <!-- salvage max items -->
         <DropSalvage>1</DropSalvage><!--  only used if != 1 -->
+        <T2SalvageChance>0.25</T2SalvageChance><!-- 0..1 - chance a salvaged NPC wreck also gives one tech 2 material.  Crucible: 0.  дома: 25% -->
         <DropItem>1</DropItem><!-- integer multiplier on npc/structure loot quantities.  only used if > 1 -->
         <DropMoney>1.0</DropMoney><!-- multiplier on agent mission isk reward and bonus.  only used if != 1.0 -->
         <!-- for repair system -->

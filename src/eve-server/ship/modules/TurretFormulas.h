@@ -39,7 +39,8 @@ public:
      *  tracking disruptors on the shooter.  logType gets one line with every term (DAMAGE__TRACE, DAMAGE__TRACE_NPC;
      *  utils/npcai/check_shots.py checks those lines against the formula), record (optional) the same terms */
     static float Roll(SystemEntity* pShooter, SystemEntity* pTarget, double optimal, double falloff, double tracking,
-                      double sigRes, double u, LogType logType, const char* who, NpcShotRecord* record = nullptr);
+                      double sigRes, double u, LogType logType, const char* who, NpcShotRecord* record = nullptr,
+                      double shooterSpeedCap = 0.0);
 };
 
 

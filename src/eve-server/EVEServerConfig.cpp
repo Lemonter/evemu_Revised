@@ -89,6 +89,10 @@ EVEServerConfig::EVEServerConfig()
     world.SecureContainerOwnerBypass = true;    // (F20)
     world.highSecCyno = false;
     world.capitalsEverywhere = false;       // Crucible: capitals never use acceleration gates
+    world.droneAutoMine = false;            // Crucible: mining drones only mine what they're told to
+    world.miningDroneRange = 0.0f;          // 0: the drone's own range
+    world.salvageDroneTypeID = 0;           // Crucible has no salvage drones
+    world.tractorAutoLoot = false;          // Crucible: a tractor beam only pulls
     world.empireInterdiction = false;
     world.fleetWarpOnGridOnly = false;      // Crucible fleet warp is system-wide (on-grid only came in 2015)  (F08)
     world.fleetWarpSlowestSpeed = true;     // every ship in a fleet warp uses the slowest warp speed  (F08)
@@ -117,6 +121,7 @@ EVEServerConfig::EVEServerConfig()
     rates.DropItem = 1;         // integer multiplier on npc/structure loot quantities
     rates.DropMoney = 1.0;      // multiplier on agent mission isk reward and bonus  (F12)
     rates.DropSalvage = 1;//P
+    rates.T2SalvageChance = 0.0f;   // Crucible: tech 2 salvage only from the wrecks whose faction lists it
     rates.RepairCost = 1.0;
     rates.ShipRepairModifier = 0.0000075;
     rates.ModuleRepairModifier = 0.00125;
@@ -803,6 +808,10 @@ bool EVEServerConfig::ProcessWorld( const TiXmlElement* ele )
     AddValueParser( "saveOnUpdate",      world.saveOnUpdate );
     AddValueParser( "highSecCyno",       world.highSecCyno );
     AddValueParser( "capitalsEverywhere", world.capitalsEverywhere );
+    AddValueParser( "droneAutoMine",     world.droneAutoMine );
+    AddValueParser( "miningDroneRange",  world.miningDroneRange );
+    AddValueParser( "salvageDroneTypeID", world.salvageDroneTypeID );
+    AddValueParser( "tractorAutoLoot",   world.tractorAutoLoot );
     AddValueParser( "empireInterdiction", world.empireInterdiction );
     AddValueParser( "fleetWarpOnGridOnly", world.fleetWarpOnGridOnly );
     AddValueParser( "fleetWarpSlowestSpeed", world.fleetWarpSlowestSpeed );
@@ -831,6 +840,10 @@ bool EVEServerConfig::ProcessWorld( const TiXmlElement* ele )
     RemoveParser( "saveOnUpdate" );
     RemoveParser( "highSecCyno" );
     RemoveParser( "capitalsEverywhere" );
+    RemoveParser( "droneAutoMine" );
+    RemoveParser( "miningDroneRange" );
+    RemoveParser( "salvageDroneTypeID" );
+    RemoveParser( "tractorAutoLoot" );
     RemoveParser( "empireInterdiction" );
     RemoveParser( "fleetWarpOnGridOnly" );
     RemoveParser( "fleetWarpSlowestSpeed" );
@@ -869,6 +882,7 @@ bool EVEServerConfig::ProcessRates( const TiXmlElement* ele )
     AddValueParser( "DropItem",             rates.DropItem );
     AddValueParser( "DropMoney",            rates.DropMoney );
     AddValueParser( "DropSalvage",          rates.DropSalvage );
+    AddValueParser( "T2SalvageChance",      rates.T2SalvageChance );
     AddValueParser( "RepairCost",           rates.RepairCost );
     AddValueParser( "ShipRepairModifier",   rates.ShipRepairModifier );
     AddValueParser( "ModuleRepairModifier", rates.ModuleRepairModifier );
@@ -901,6 +915,7 @@ bool EVEServerConfig::ProcessRates( const TiXmlElement* ele )
     RemoveParser( "DropItem" );
     RemoveParser( "DropMoney" );
     RemoveParser( "DropSalvage" );
+    RemoveParser( "T2SalvageChance" );
     RemoveParser( "RepairCost" );
     RemoveParser( "ShipRepairModifier" );
     RemoveParser( "ModuleRepairModifier" );

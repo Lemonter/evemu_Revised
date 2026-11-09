@@ -13,6 +13,7 @@
   *   (rolled before the hit, so they landed at any range) are gone (bug B2)
   */
 
+#include <cmath>
 #include "character/Character.h" // this sets compat includes for this file
 #include "npc/NPC.h"
 #include "npc/NPCAI.h"
@@ -43,11 +44,24 @@ namespace {
 }
 
 float TurretFormulas::Roll(SystemEntity* pShooter, SystemEntity* pTarget, double optimal, double falloff, double tracking,
-                           double sigRes, double u, LogType logType, const char* who, NpcShotRecord* record/*nullptr*/)
+                           double sigRes, double u, LogType logType, const char* who, NpcShotRecord* record/*nullptr*/,
+                           double shooterSpeedCap/*0*/)
 {
     if ((pShooter == nullptr) or (pTarget == nullptr))
         return 0.0f;
-    NpcMath::TurretGeometry g(NpcMath::Geometry(PositionOf(pShooter), VelocityOf(pShooter), pShooter->GetRadius(),
+    // the shooter's own speed counts for at most shooterSpeedCap (drones:  their combat orbit speed, so a fast approach
+    //  - the home server's maxVelocity x100 - doesn't spoil their aim)
+    NpcMath::Vec3 shooterVel(VelocityOf(pShooter));
+    if (shooterSpeedCap > 0.0) {
+        double speed(std::sqrt(shooterVel.x * shooterVel.x + shooterVel.y * shooterVel.y + shooterVel.z * shooterVel.z));
+        if (speed > shooterSpeedCap) {
+            double k(shooterSpeedCap / speed);
+            shooterVel.x *= k;
+            shooterVel.y *= k;
+            shooterVel.z *= k;
+        }
+    }
+    NpcMath::TurretGeometry g(NpcMath::Geometry(PositionOf(pShooter), shooterVel, pShooter->GetRadius(),
                                                 PositionOf(pTarget), VelocityOf(pTarget), pTarget->GetRadius()));
     NpcMath::TurretInputs in = NpcMath::TurretInputs();
         in.angular = g.angular;
@@ -153,7 +167,7 @@ float TurretFormulas::GetDroneToHit(DroneSE* pDrone, SystemEntity* pTarget, floa
         return static_cast<float>(shot.damage);
     }
     float shot(Roll(pDrone, pTarget, stats.optimalRange, stats.falloff, stats.tracking, stats.sigResolution, MakeRandomFloat(),
-                    DAMAGE__TRACE, "Drone"));
+                    DAMAGE__TRACE, "Drone", nullptr, stats.orbitVelocity));
     if (quality != nullptr)
         *quality = shot;
     return shot;

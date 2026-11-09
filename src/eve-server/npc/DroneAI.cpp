@@ -21,6 +21,12 @@
  *     attacked the pilot or the drones (focus fire puts all of the pilot's drones on the same target)
  *  - mining drones fly to the asteroid and mine one cycle.  at the end of the cycle the ore goes straight into the
  *     ship's cargo hold, provided the ship is within the drone's range.  mine repeatedly keeps going
+ *  - home server (world.droneAutoMine):  idle mining drones find the nearest asteroid within world.miningDroneRange of the
+ *     ship by themselves, the way aggressive combat drones find a target, and mine it until it's gone, then the next one.
+ *     ore goes to the ship's ore hold if it has one (else the cargo hold) from as far as world.miningDroneRange
+ *  - home server (world.salvageDroneTypeID):  that drone type salvages instead.  idle, it picks the nearest NPC wreck within
+ *     world.miningDroneRange of the ship, salvages it like a Salvager I (10s cycles, the wreck's access difficulty plus
+ *     5% + 5% per level of Salvaging) and puts the materials in the ship's cargo hold, then goes for the next wreck
  *  - return to bay: fly to the ship and enter the drone bay on arrival
  *  - fighter bombers attack whatever they are told to (Crucible had no capital-only rule:  their 2250m explosion radius
  *     makes them weak against subcapitals).  choosing a target themselves, they prefer one they hit in full
@@ -55,7 +61,13 @@
 #include "system/SystemBubble.h"
 #include "system/SystemManager.h"
 #include "system/Asteroid.h"
+#include "system/Container.h"
+#include "system/TargetManager.h"
+#include "exploration/WreckSalvage.h"
+#include "StaticDataMgr.h"
 #include "packets/General.h"
+
+#include <set>
 
 namespace {
     // shows one of the client's own messages (a 'notify' popup for the mining ones)
@@ -82,6 +94,7 @@ namespace {
 DroneAIMgr::DroneAIMgr(DroneSE* pDrone)
 : m_pDrone(pDrone),
   m_state(DroneAI::State::Idle),
+  m_nextRoidSearch(0.0),
   m_order(DroneAI::Order::Idle),
   m_action(DroneAI::Action::None),
   m_moveMode(0),
@@ -125,6 +138,7 @@ void DroneAIMgr::Process() {
         case DroneAI::Order::MineRepeatedly:    ProcessMine(pController);           break;
         case DroneAI::Order::Guard:
         case DroneAI::Order::Assist:            ProcessGuard(pController);          break;
+        case DroneAI::Order::Salvage:           ProcessSalvage(pController);        break;
     }
 
     if (sConfig.debug.UseProfiling)
@@ -261,6 +275,9 @@ void DroneAIMgr::Aggressed(SystemEntity* pAttacker) {
  * ====================================================================================== */
 
 void DroneAIMgr::ProcessIdle(ShipSE* pController) {
+    // auto-mining and salvage drones go after work wherever it is within range, even outside the ship's bubble
+    if (AutoMine(pController) or AutoSalvage(pController))
+        return;
     // our ship has gone elsewhere.  fighters warp after it, other drones wait here
     if ((pController->SysBubble() != m_pDrone->SysBubble()) or pController->DestinyMgr()->IsWarping()) {
         if (WarpAfter(pController, DroneAI::State::Returning)) {
@@ -386,9 +403,21 @@ void DroneAIMgr::ProcessEngage(ShipSE* pController) {
 }
 
 void DroneAIMgr::ProcessMine(ShipSE* pController) {
+    // a salvage drone keeps its mining drone menu in the client.  it doesn't mine
+    if (m_action == DroneAI::Action::Salvage) {
+        SetIdle();
+        return;
+    }
     Client* pClient(pController->GetPilot());
     SystemEntity* pRoid(m_pDrone->SystemMgr()->GetSE(m_targetID));
     if ((pRoid == nullptr) or !pRoid->IsAsteroidSE() or (pRoid->GetSelf()->GetAttribute(AttrQuantity).get_double() <= 0.0)) {
+        if (sConfig.world.droneAutoMine) {
+            // the rock is done:  idle picks the next one
+            StopCycle();
+            m_targetID = 0;
+            SetIdle();
+            return;
+        }
         //{'FullPath': u'UI/Messages', 'messageID': 259462, 'label': u'MiningDronesDeactivatedAsteroidEmptyBody'}(u'{modulename} deactivates as it finds the resource it was harvesting a pale shadow of its former glory.')
         SendDroneMessage(pClient, "MiningDronesDeactivatedAsteroidEmpty", {{"modulename", new PyString(m_pDrone->GetName())}});
         ReturnHome();
@@ -889,10 +918,10 @@ void DroneAIMgr::FinishMiningCycle(ShipSE* pController, SystemEntity* pRoid) {
     const DroneStats& stats(m_pDrone->Stats());
 
     double distance(Gap(m_pDrone, pController));
-    if (distance > stats.effectRange) {
+    if (distance > MiningDeliveryRange()) {
         //{'FullPath': u'UI/Messages', 'messageID': 259422, 'label': u'MiningDronesDeactivatedOutOfRangeBody'}(u'{[item]module.name} deactivates without transfering ore to your cargo hold because your ship has strayed to a distance of {[numeric]distance} m, beyond its mining range of {[numeric]range} m.')
         SendDroneMessage(pClient, "MiningDronesDeactivatedOutOfRange", {{"module", new PyInt(m_pDrone->GetSelf()->typeID())},
-                {"distance", new PyInt(static_cast<int32>(distance))}, {"range", new PyInt(static_cast<int32>(stats.effectRange))}});
+                {"distance", new PyInt(static_cast<int32>(distance))}, {"range", new PyInt(static_cast<int32>(MiningDeliveryRange()))}});
         ReturnHome();
         return;
     }
@@ -911,7 +940,11 @@ void DroneAIMgr::FinishMiningCycle(ShipSE* pController, SystemEntity* pRoid) {
         return;
 
     ShipItemRef shipRef(pController->GetShipItemRef());
-    if (shipRef->GetRemainingVolumeByFlag(flagCargoHold) < units * oreVolume) {
+    // ore goes where mining lasers put it:  the ore hold, if the ship has one
+    EVEItemFlags holdFlag(flagCargoHold);
+    if (shipRef->HasAttribute(AttrOreHoldCapacity) and (shipRef->GetAttribute(AttrOreHoldCapacity).get_double() > 0.0))
+        holdFlag = flagOreHold;
+    if (shipRef->GetRemainingVolumeByFlag(holdFlag) < units * oreVolume) {
         //{'FullPath': u'UI/Messages', 'messageID': 259442, 'label': u'MiningDronesDeactivatedCargoHoldFullBody'}(u'{modulename} disperses its load of freshly mined ore into space unrecoverably, then deactivates. Your cargo hold is full.')
         SendDroneMessage(pClient, "MiningDronesDeactivatedCargoHoldFull", {{"modulename", new PyString(m_pDrone->GetName())}});
         ReturnHome();
@@ -924,7 +957,7 @@ void DroneAIMgr::FinishMiningCycle(ShipSE* pController, SystemEntity* pRoid) {
         _log(DRONE__ERROR, "Drone %s(%u): could not create mined ore for %s", m_pDrone->GetName(), m_pDrone->GetID(), pClient->GetName());
         return;
     }
-    oRef->MergeTypesInCargo(shipRef.get(), flagCargoHold);
+    oRef->MergeTypesInCargo(shipRef.get(), holdFlag);
     sStatMgr.Add(Stat::oreMined, units * oreVolume);
 
     // quantity, mass, radius (broadcast) and the industrial index, as for lasers
@@ -938,3 +971,193 @@ void DroneAIMgr::FinishMiningCycle(ShipSE* pController, SystemEntity* pRoid) {
     pRoid->Delete();
     SafeDelete(pRoid);
 }
+
+/* ======================================================================================
+ *  home server:  mining drones that find their own rock (world.droneAutoMine)
+ * ====================================================================================== */
+
+double DroneAIMgr::MiningDeliveryRange() const {
+    double range(m_pDrone->Stats().effectRange);
+    if (sConfig.world.droneAutoMine and (sConfig.world.miningDroneRange > range))
+        range = sConfig.world.miningDroneRange;
+    return range;
+}
+
+bool DroneAIMgr::AutoMine(ShipSE* pController) {
+    if ((m_action != DroneAI::Action::Mine) or !sConfig.world.droneAutoMine)
+        return false;
+    if (pController->DestinyMgr()->IsWarping())
+        return false;
+    double now(GetTimeMSeconds());
+    if (now < m_nextRoidSearch)
+        return false;
+    m_nextRoidSearch = now + 3000.0;
+    SystemEntity* pRoid(FindAsteroid(pController));
+    if (pRoid == nullptr)
+        return false;
+    _log(DRONE__AI_TRACE, "Drone %s(%u): auto-mining %s(%u)", m_pDrone->GetName(), m_pDrone->GetID(), pRoid->GetName(), pRoid->GetID());
+    Mine(pRoid, true);
+    return true;
+}
+
+/* the nearest asteroid to the ship within range.  a rock another of the pilot's drones is already on counts as farther
+ *  away, so a flight of drones spreads over the belt instead of queueing on one rock
+ */
+SystemEntity* DroneAIMgr::FindAsteroid(ShipSE* pController) {
+    double range(MiningDeliveryRange());
+    std::set<uint32> taken;
+    for (auto cur : m_pDrone->SystemMgr()->GetDrones())
+        if ((cur.second != m_pDrone) and (cur.second->GetControllerOwnerID() == m_pDrone->GetControllerOwnerID())
+        and (cur.second->GetAI()->GetOrder() == DroneAI::Order::MineRepeatedly))
+            taken.insert(cur.second->GetAI()->GetTargetID());
+
+    SystemEntity* pBest(nullptr);
+    double best(0.0);
+    for (auto cur : m_pDrone->SystemMgr()->GetEntities()) {
+        SystemEntity* pSE(cur.second);
+        if ((pSE == nullptr) or !pSE->IsAsteroidSE() or pSE->IsDead())
+            continue;
+        if (pSE->GetSelf()->GetAttribute(AttrQuantity).get_double() < 1.0)
+            continue;
+        double gap(Gap(pController, pSE));
+        if (gap > range)
+            continue;
+        if (taken.find(pSE->GetID()) != taken.end())
+            gap += range;
+        if ((pBest == nullptr) or (gap < best)) {
+            pBest = pSE;
+            best = gap;
+        }
+    }
+    return pBest;
+}
+
+/* ======================================================================================
+ *  home server:  salvage drones (world.salvageDroneTypeID)
+ * ====================================================================================== */
+
+bool DroneAIMgr::AutoSalvage(ShipSE* pController) {
+    if (m_action != DroneAI::Action::Salvage)
+        return false;
+    if (pController->DestinyMgr()->IsWarping())
+        return false;
+    double now(GetTimeMSeconds());
+    if (now < m_nextRoidSearch)
+        return false;
+    m_nextRoidSearch = now + 3000.0;
+    SystemEntity* pWreck(FindWreck(pController));
+    if (pWreck == nullptr)
+        return false;
+    _log(DRONE__AI_TRACE, "Drone %s(%u): salvaging %s(%u)", m_pDrone->GetName(), m_pDrone->GetID(), pWreck->GetName(), pWreck->GetID());
+    StopCycle();
+    SetOrder(DroneAI::Order::Salvage, pWreck->GetID());
+    SetState(DroneAI::State::Approaching);
+    return true;
+}
+
+/* the nearest NPC wreck to the ship that still has salvage in it.  wrecks the pilot's other salvage drones are on count as
+ *  farther away, so several drones spread over a field of wrecks
+ */
+SystemEntity* DroneAIMgr::FindWreck(ShipSE* pController) {
+    double range(MiningDeliveryRange());
+    std::set<uint32> taken;
+    for (auto cur : m_pDrone->SystemMgr()->GetDrones())
+        if ((cur.second != m_pDrone) and (cur.second->GetControllerOwnerID() == m_pDrone->GetControllerOwnerID())
+        and (cur.second->GetAI()->GetOrder() == DroneAI::Order::Salvage))
+            taken.insert(cur.second->GetAI()->GetTargetID());
+
+    SystemEntity* pBest(nullptr);
+    double best(0.0);
+    for (auto cur : m_pDrone->SystemMgr()->GetEntities()) {
+        SystemEntity* pSE(cur.second);
+        if ((pSE == nullptr) or !pSE->IsWreckSE() or pSE->IsDead() or pSE->GetWreckSE()->IsSalvageDone())
+            continue;
+        // a tractor beam is pulling it in for its loot:  leave it until it lets go
+        if ((pSE->DestinyMgr() != nullptr) and pSE->DestinyMgr()->IsTractored())
+            continue;
+        if (m_badWrecks.find(pSE->GetID()) != m_badWrecks.end())
+            continue;
+        // player wrecks (and anything else without a salvage table) give nothing
+        std::vector<uint32> list;
+        sDataMgr.GetSalvage(atoi(pSE->GetSelf()->customInfo().c_str()), list);
+        if (list.empty())
+            continue;
+        double gap(Gap(pController, pSE));
+        if (gap > range)
+            continue;
+        if (taken.find(pSE->GetID()) != taken.end())
+            gap += range;
+        if ((pBest == nullptr) or (gap < best)) {
+            pBest = pSE;
+            best = gap;
+        }
+    }
+    return pBest;
+}
+
+void DroneAIMgr::ProcessSalvage(ShipSE* pController) {
+    SystemEntity* pWreck(m_pDrone->SystemMgr()->GetSE(m_targetID));
+    if ((pWreck == nullptr) or !pWreck->IsWreckSE() or pWreck->IsDead() or pWreck->GetWreckSE()->IsSalvageDone()
+    or ((pWreck->DestinyMgr() != nullptr) and pWreck->DestinyMgr()->IsTractored())) {
+        // someone else got it, it decayed, or a tractor beam took it for its loot:  idle picks the next one
+        StopCycle();
+        m_targetID = 0;
+        SetIdle();
+        return;
+    }
+
+    const DroneStats& stats(m_pDrone->Stats());
+    double gap(Gap(m_pDrone, pWreck));
+    if (!m_cycleActive) {
+        if (gap > stats.effectRange) {
+            ApproachTarget(pWreck, stats.orbitRange, stats.maxVelocity);
+            SetState(DroneAI::State::Approaching);
+            return;
+        }
+        m_cycleActive = true;
+        m_cycleTimer.Start(static_cast<uint32>(stats.cycleTime));
+        SendEffect(pWreck, true);
+    }
+    OrbitTarget(pWreck, stats.orbitRange, stats.orbitVelocity);
+    SetState(DroneAI::State::Mining);
+
+    if (!m_cycleTimer.Check(false))
+        return;
+    m_cycleTimer.Disable();
+    m_cycleActive = false;
+    SendEffect(pWreck, false);
+
+    // a Salvager I's roll:  the wreck's access difficulty plus the drone's bonus, in percent
+    double chance(pWreck->GetSelf()->GetAttribute(AttrAccessDifficulty).get_double() + stats.salvageBonus);
+    if (chance <= 0.0) {
+        // too complex for this pilot:  leave it
+        m_badWrecks.insert(m_targetID);
+        m_targetID = 0;
+        SetIdle();
+        return;
+    }
+    if (MakeRandomFloat(0.0, 100.0) >= chance)
+        return;     // failed cycle:  the next one starts on the next tick
+
+    FinishSalvage(pController, pWreck);
+    m_targetID = 0;
+    SetIdle();
+}
+
+void DroneAIMgr::FinishSalvage(ShipSE* pController, SystemEntity* pWreck) {
+    Client* pClient(pController->GetPilot());
+    // salvagers on it get SalvagingTooLate
+    pWreck->GetWreckSE()->SetSalvageDone();
+    bool overloaded(false);
+    uint32 dropped(WreckSalvage::Salvage(pWreck, pController->GetShipItemRef(), pClient, flagCargoHold, overloaded));
+    _log(DRONE__AI_TRACE, "Drone %s(%u): salvaged %s(%u), %u stacks%s", m_pDrone->GetName(), m_pDrone->GetID(), pWreck->GetName(),
+         pWreck->GetID(), dropped, overloaded ? ", cargo full" : "");
+    sStatMgr.Increment(Stat::shipsSalvaged);
+
+    // the wreck is gone.  anything locking it is told so
+    if (pWreck->TargetMgr() != nullptr)
+        pWreck->TargetMgr()->Destroyed();
+    pWreck->Delete();
+    SafeDelete(pWreck);
+}
+

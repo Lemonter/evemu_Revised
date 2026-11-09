@@ -252,7 +252,11 @@ void DroneSE::UpdateStats() {
     double navBonus(drone ? 1.0 + 0.05 * level(DroneNavigation) : 1.0);
     s.maxVelocity = base(AttrMaxVelocity, 0.0) * navBonus * s.hullVelocity;
     s.orbitVelocity = base(AttrEntityCruiseSpeed, 0.0);
-    if ((s.orbitVelocity <= 0.0) or (s.orbitVelocity > s.maxVelocity))
+    // no cruise speed of their own (mining drones):  they orbit at full speed, but no faster than 1 km/s.  Crucible's are
+    //  well below that;  the cap keeps a sped-up drone (the home server's maxVelocity x100) on its orbit
+    if (s.orbitVelocity <= 0.0)
+        s.orbitVelocity = std::min(s.maxVelocity, 1000.0);
+    if (s.orbitVelocity > s.maxVelocity)
         s.orbitVelocity = s.maxVelocity;
 
     s.optimalRange = base(AttrMaxRange, 0.0) * (drone ? 1.0 + 0.05 * level(DroneSharpshooting) : 1.0);
@@ -302,6 +306,14 @@ void DroneSE::UpdateStats() {
         s.cycleTime = base(AttrSpeed, 0.0);
     if (s.cycleTime <= 0.0)
         s.cycleTime = 5000.0;
+
+    // home server:  world.salvageDroneTypeID salvages wrecks (with its own model and beam) on a salvager's 10s cycle.
+    //  its chance is a Salvager I's:  5% plus 5% per level of Salvaging, on top of the wreck's access difficulty
+    if ((sConfig.world.salvageDroneTypeID != 0) and (m_self->typeID() == sConfig.world.salvageDroneTypeID)) {
+        s.action = DroneAI::Action::Salvage;
+        s.cycleTime = 10000.0;
+        s.salvageBonus = 5.0 + 5.0 * level(Salvaging);
+    }
 
     s.damageMultiplier = base(AttrDamageMultiplier, 1.0);
     if (drone)

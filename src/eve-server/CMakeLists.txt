@@ -275,13 +275,15 @@ SET( explore_INCLUDE
      "${TARGET_INCLUDE_DIR}/exploration/Probes.h"
      "${TARGET_INCLUDE_DIR}/exploration/Scan.h"
      "${TARGET_INCLUDE_DIR}/exploration/ScanMgrService.h"
-     "${TARGET_INCLUDE_DIR}/exploration/ScanningDB.h")
+     "${TARGET_INCLUDE_DIR}/exploration/ScanningDB.h"
+     "${TARGET_INCLUDE_DIR}/exploration/WreckSalvage.h")
 SET( explore_SOURCE
      "${TARGET_SOURCE_DIR}/exploration/Exploration.cpp"
      "${TARGET_SOURCE_DIR}/exploration/Probes.cpp"
      "${TARGET_SOURCE_DIR}/exploration/Scan.cpp"
      "${TARGET_SOURCE_DIR}/exploration/ScanMgrService.cpp"
-     "${TARGET_SOURCE_DIR}/exploration/ScanningDB.cpp")
+     "${TARGET_SOURCE_DIR}/exploration/ScanningDB.cpp"
+     "${TARGET_SOURCE_DIR}/exploration/WreckSalvage.cpp")
 
 SET( faction_INCLUDE
      "${TARGET_INCLUDE_DIR}/faction/FactionWarMgrDB.h"

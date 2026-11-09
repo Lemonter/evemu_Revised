@@ -55,6 +55,7 @@ class Damage;
 // a drone's working numbers, from its type and its owner's skills and ship
 struct DroneStats {
     uint8 action;               // DroneAI::Action
+    double salvageBonus;        // salvage drones:  % added to the wreck's access difficulty (the pilot's Salvaging)
     uint16 effectID;            // main effect (weapon, mining laser, repairer...)
     bool offensive;
     bool assistance;

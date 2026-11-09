@@ -82,6 +82,10 @@ public:
         bool saveOnUpdate;
         bool highSecCyno;
         bool capitalsEverywhere;    // capitals use acceleration gates (missions, deadspace) like any other ship
+        bool droneAutoMine;         // idle mining drones pick the nearest asteroid themselves and keep mining
+        float miningDroneRange;     // m.  auto-mining drones look for rock and still deliver ore this far from the ship
+        uint32 salvageDroneTypeID;  // this drone type salvages wrecks instead of using its own effect (0: none)
+        bool tractorAutoLoot;       // tractor beams empty what they pull in into the cargo hold, then take the next wreck or can
         bool empireInterdiction;
         bool fleetWarpOnGridOnly;
         bool fleetWarpSlowestSpeed;
@@ -128,6 +132,7 @@ public:
         uint8 DropItem;
         float DropMoney;
         uint8 DropSalvage;
+        float T2SalvageChance;      // 0..1:  chance a salvaged NPC wreck also gives one tech 2 material
         float RepairCost;
         float ShipRepairModifier;
         float ModuleRepairModifier;

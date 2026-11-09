@@ -155,6 +155,11 @@ private:
     void                CargoScanResult();
     // the target resists this scanner (shipScanResistance / cargoScanResistance, % chance)
     bool                ScanResisted(uint16 resistAttr);
+    // home server (world.tractorAutoLoot):  empty what the beam has pulled in, then move on to the next wreck or can
+    void                TractorCycle();
+    bool                CanTractor(SystemEntity* pSE);
+    SystemEntity*       FindTractorTarget();
+    void                RetargetTractor(SystemEntity* pNext);
 
     /* warp disruption field generator, sphere mode */
     void                StartDisruptField();

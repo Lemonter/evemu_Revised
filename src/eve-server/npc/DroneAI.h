@@ -10,6 +10,7 @@
 #ifndef __EVEMU_SHIP_DRONEAI_H__
 #define __EVEMU_SHIP_DRONEAI_H__
 
+#include <set>
 #include "ship/modules/TurretFormulas.h"
 
 namespace DroneAI {
@@ -38,7 +39,8 @@ namespace DroneAI {
             ReturnHome      = 4,
             ReturnBay       = 5,
             Guard           = 6,
-            Assist          = 7
+            Assist          = 7,
+            Salvage         = 8     // home server:  salvage the target wreck, then look for the next
         };
     }
     // what the drone's main effect does to its target
@@ -50,7 +52,8 @@ namespace DroneAI {
             RepairShield    = 3,
             RepairArmor     = 4,
             Web             = 5,
-            Ewar            = 6     // jammers, painters, dampeners, disruptors, neutralizers.  effects only, for now
+            Ewar            = 6,    // jammers, painters, dampeners, disruptors, neutralizers.  effects only, for now
+            Salvage         = 7     // home server:  salvage drones (world.salvageDroneTypeID)
         };
     }
 }
@@ -90,6 +93,13 @@ public:
 
 private:
     void ProcessIdle(ShipSE* pController);
+    bool AutoMine(ShipSE* pController);                 // world.droneAutoMine: pick the nearest rock and mine it
+    bool AutoSalvage(ShipSE* pController);              // salvage drones: pick the nearest wreck and salvage it
+    SystemEntity* FindWreck(ShipSE* pController);
+    void ProcessSalvage(ShipSE* pController);
+    void FinishSalvage(ShipSE* pController, SystemEntity* pWreck);
+    SystemEntity* FindAsteroid(ShipSE* pController);
+    double MiningDeliveryRange() const;                 // how far from the ship ore still reaches its hold
     void ProcessReturn(ShipSE* pController, bool toBay);
     void ProcessEngage(ShipSE* pController);
     void ProcessMine(ShipSE* pController);
@@ -149,6 +159,8 @@ private:
 
     bool m_cycleActive;
     Timer m_cycleTimer;         // weapon/mining/repair cycle
+    double m_nextRoidSearch;    // ms.  auto-mining and salvage drones look for work at most every few seconds
+    std::set<uint32> m_badWrecks;   // wrecks too complex for this drone's pilot
 
     TurretFormulas m_formula;
 };
