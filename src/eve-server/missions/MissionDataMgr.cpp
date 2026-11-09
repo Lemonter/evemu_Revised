@@ -995,9 +995,10 @@ PyList* MissionDataMgr::BuildBookmarks(MissionOffer& data)
 void MissionDataMgr::GetShipRestrictions(uint8 level, std::vector<uint32>& allowed, std::vector<uint32>& denied)
 {
     using namespace EVEDB::invGroups;
-    // capitals never use acceleration gates
+    // capitals never use acceleration gates (unless world.capitalsEverywhere)
     const uint32 capitals[] = { Titan, Dreadnought, Freighter, Carrier, Supercarrier, CapitalIndustrialShip, JumpFreighter };
-    denied.insert(denied.end(), std::begin(capitals), std::end(capitals));
+    if (!sConfig.world.capitalsEverywhere)
+        denied.insert(denied.end(), std::begin(capitals), std::end(capitals));
     if (level > 2)
         return;
 

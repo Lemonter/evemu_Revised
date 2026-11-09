@@ -112,7 +112,8 @@ boolean can use either 0/1 OR true/false.
         <SelfDestructDelay>120</SelfDestructDelay><!-- seconds from starting a self-destruct to the explosion (Crucible: 120) -->
         <SelfDestructRetryDelay>30</SelfDestructRetryDelay><!-- seconds after aborting a self-destruct before another may be started -->
         <StoreShipWithCargo>false</StoreShipWithCargo><!-- bool - ships stored in a maintenance bay/array may carry cargo (only assembled containers are refused, the Odyssey rule).  Crucible: false (charges only) -->
-        <highSecCyno>false</highSecCyno><!-- bool - allow Cynosural fields to be created in high security space -->
+        <highSecCyno>true</highSecCyno><!-- bool - allow Cynosural fields to be created in high security space.  дома: капиталы летают везде -->
+        <capitalsEverywhere>true</capitalsEverywhere><!-- bool - capitals use acceleration gates (missions, deadspace).  Crucible: false -->
         <empireInterdiction>false</empireInterdiction><!-- bool - allow items flagged 'disallowInEmpireSpace' (warp disruption bubbles, HIC fields, bombs, doomsday) in high and low security space.  Crucible: false -->
         <fleetWarpOnGridOnly>false</fleetWarpOnGridOnly><!-- bool - fleet/wing/squad warp only takes members on the commander's grid (the 2015 rule).  Crucible: false (every member in the system warps) -->
         <TrashRetentionDays>30</TrashRetentionDays><!-- days a trashed item is kept for GM restore (/untrash) before it is purged at server startup.  0 = trashed items are deleted at once -->

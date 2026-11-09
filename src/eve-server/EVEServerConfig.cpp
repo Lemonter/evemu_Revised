@@ -88,6 +88,7 @@ EVEServerConfig::EVEServerConfig()
     world.TrashRetentionDays = 30;          // trashed items restorable by a GM for 30 days  (F20)
     world.SecureContainerOwnerBypass = true;    // (F20)
     world.highSecCyno = false;
+    world.capitalsEverywhere = false;       // Crucible: capitals never use acceleration gates
     world.empireInterdiction = false;
     world.fleetWarpOnGridOnly = false;      // Crucible fleet warp is system-wide (on-grid only came in 2015)  (F08)
     world.fleetWarpSlowestSpeed = true;     // every ship in a fleet warp uses the slowest warp speed  (F08)
@@ -801,6 +802,7 @@ bool EVEServerConfig::ProcessWorld( const TiXmlElement* ele )
     AddValueParser( "saveOnMove",        world.saveOnMove );
     AddValueParser( "saveOnUpdate",      world.saveOnUpdate );
     AddValueParser( "highSecCyno",       world.highSecCyno );
+    AddValueParser( "capitalsEverywhere", world.capitalsEverywhere );
     AddValueParser( "empireInterdiction", world.empireInterdiction );
     AddValueParser( "fleetWarpOnGridOnly", world.fleetWarpOnGridOnly );
     AddValueParser( "fleetWarpSlowestSpeed", world.fleetWarpSlowestSpeed );
@@ -828,6 +830,7 @@ bool EVEServerConfig::ProcessWorld( const TiXmlElement* ele )
     RemoveParser( "saveOnMove" );
     RemoveParser( "saveOnUpdate" );
     RemoveParser( "highSecCyno" );
+    RemoveParser( "capitalsEverywhere" );
     RemoveParser( "empireInterdiction" );
     RemoveParser( "fleetWarpOnGridOnly" );
     RemoveParser( "fleetWarpSlowestSpeed" );

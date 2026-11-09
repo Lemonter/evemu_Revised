@@ -81,6 +81,7 @@ public:
         bool saveOnMove;
         bool saveOnUpdate;
         bool highSecCyno;
+        bool capitalsEverywhere;    // capitals use acceleration gates (missions, deadspace) like any other ship
         bool empireInterdiction;
         bool fleetWarpOnGridOnly;
         bool fleetWarpSlowestSpeed;

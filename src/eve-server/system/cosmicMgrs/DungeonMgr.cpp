@@ -448,9 +448,9 @@ void DungeonDataMgr::GetShipRestrictions(uint32 dungeonID, std::vector<uint32>& 
         allowed.insert(itr->second.allowedGroups.begin(), itr->second.allowedGroups.end());
         denied.insert(itr->second.deniedGroups.begin(), itr->second.deniedGroups.end());
     }
-    // capitals can't use acceleration gates, so only single-room dungeons are open to them
+    // capitals can't use acceleration gates, so only single-room dungeons are open to them (world.capitalsEverywhere lifts it)
     auto dItr = m_dungeons.find(dungeonID);
-    if ((dItr == m_dungeons.end()) or (dItr->second->roomOrder.size() > 1)) {
+    if (!sConfig.world.capitalsEverywhere and ((dItr == m_dungeons.end()) or (dItr->second->roomOrder.size() > 1))) {
         denied.insert(EVEDB::invGroups::Titan);
         denied.insert(EVEDB::invGroups::Dreadnought);
         denied.insert(EVEDB::invGroups::Freighter);
@@ -2447,7 +2447,7 @@ void DungeonMgr::ActivateGate(Client* pClient, uint32 gateItemID)
         }
         return names;
     };
-    if (DungeonDataMgr::IsCapitalGroup(shipGroupID) or ((pDef != nullptr) and shipLists and
+    if ((DungeonDataMgr::IsCapitalGroup(shipGroupID) and !sConfig.world.capitalsEverywhere) or ((pDef != nullptr) and shipLists and
         (std::find(pDef->deniedGroups.begin(), pDef->deniedGroups.end(), shipGroupID) != pDef->deniedGroups.end())))
     {
         std::vector<uint32> denied, allowed;
