@@ -62,7 +62,7 @@ ENV CCACHE_DIR=/ccache
 RUN --mount=type=cache,id=evemu-build,target=/src/build \
     --mount=type=cache,id=evemu-ccache,target=/ccache \
     cmake -DCMAKE_INSTALL_PREFIX=/app -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DEVEMU_BUILD_BOT=ON .. && \
     make -j$(nproc) && \
     make install
 

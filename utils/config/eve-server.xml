@@ -310,7 +310,7 @@ boolean can use either 0/1 OR true/false.
         <startSecRating>1.0</startSecRating>
         <startCorporation>0</startCorporation><!-- corporationID for new characters '0' to use default based on school -->
         <terminationDelay>1800</terminationDelay> <!-- seconds  30m default -->
-        <statMultiplier>1</statMultiplier><!-- stats are multiplied by this (after remap) -->
+        <statMultiplier>100</statMultiplier><!-- stats are multiplied by this (after remap).  дома ×100: навыки учатся в 100 раз быстрее (скорость = осн. + втор./2) -->
         <allow3edChar>false</allow3edChar><!-- (dis)allow creating a third character -->
         <!-- clones, implants and boosters -->
         <requirePausedTraining>true</requirePausedTraining><!-- bool  Crucible: plugging in implants, consuming boosters and clone jumping need a paused skill queue.  false recalculates the queue instead -->
