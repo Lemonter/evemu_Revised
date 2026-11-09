@@ -32,6 +32,7 @@
  */
 
 #include "eve-bot.h"
+#include "auth/PasswordModule.h"
 
 #include <functional>
 
@@ -250,18 +251,26 @@ public:
             cc.boot_codename = EVEProjectCodename;
             cc.boot_region = EVEProjectRegion;
             cc.user_name = user;
-            cc.user_password = pass;
+            cc.user_password = "";
             cc.user_password_hash = "";
             cc.user_languageid = "EN";
             cc.user_affiliateid = 0;
+        // like the game client:  the hash first.  the server answers with its password version:  2 = it checks the hash,
+        //  1 = the account still has a plain password, so the same challenge goes again with the password (the server then
+        //  converts the account to a hash).  then the server handshake (or a login failure)
+        PasswordModule::GeneratePassHash(user, pass, cc.user_password_hash);
         m_con->QueueRep(cc.Encode());
-
-        // password version, then the server handshake (or a login failure)
-        for (int i = 0; i < 2; ++i) {
-            rep = WaitRep(10);
-            if (rep == nullptr) { Out("login: no reply"); return false; }
-            Out("login reply: %s", Repr(rep).c_str());
+        rep = WaitRep(10);
+        if (rep == nullptr) { Out("login: no reply"); return false; }
+        Out("password version: %s", Repr(rep).c_str());
+        if (rep->IsInt() and (rep->AsInt()->value() == 1)) {
+            cc.user_password = pass;
+            cc.user_password_hash = "";
+            m_con->QueueRep(cc.Encode());
         }
+        rep = WaitRep(10);
+        if (rep == nullptr) { Out("login: no reply"); return false; }
+        Out("login reply: %s", Repr(rep).c_str());
 
         CryptoHandshakeResult hr;
             hr.challenge_responsehash = "55087";
